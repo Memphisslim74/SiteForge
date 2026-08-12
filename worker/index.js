@@ -73,7 +73,7 @@ export default {
         return json({
           app: 'SiteForge',
           status: 'ok',
-          version: '0.3.0',
+          version: '0.3.1',
           database: Boolean(env.DB),
           files: Boolean(env.FILES),
         });
@@ -297,6 +297,26 @@ export default {
           plan: { ...safePlan, url: `/api/plans/${planId}/file` },
           devices: devices || [],
         });
+      }
+
+      if (planDetailMatch && method === 'DELETE') {
+        const planId = decodeURIComponent(planDetailMatch[1]);
+        const plan = await getPlan(env, planId);
+        if (!plan) return json({ error: 'Plan not found.' }, { status: 404 });
+
+        await env.DB.batch([
+          env.DB.prepare(`DELETE FROM devices WHERE plan_id = ?`).bind(planId),
+          env.DB.prepare(`DELETE FROM plans WHERE id = ?`).bind(planId),
+          env.DB.prepare(`UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(plan.project_id),
+        ]);
+
+        try {
+          await env.FILES.delete(plan.r2_key);
+        } catch (error) {
+          console.error('SiteForge R2 cleanup error', error);
+        }
+
+        return new Response(null, { status: 204 });
       }
 
       const deviceMatch = url.pathname.match(/^\/api\/devices\/([^/]+)$/);
