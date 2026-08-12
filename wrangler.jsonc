@@ -14,5 +14,11 @@
       "database_id": "c5836981-5870-40a6-9214-9e816d4483ac",
       "migrations_dir": "migrations"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "siteforge-files"
+    }
   ]
 }
