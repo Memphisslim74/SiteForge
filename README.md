@@ -4,4 +4,4 @@ SiteForge is a field infrastructure planning application for uploading building 
 
 ## Current milestone
 
-Initial Cloudflare Worker + React deployment foundation.
+Cloudflare Worker + React deployment foundation with D1 database migration support.
