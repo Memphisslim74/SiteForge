@@ -1,5 +1,16 @@
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 
+const DEVICE_PREFIXES = {
+  ap: 'AP',
+  camera: 'CAM',
+  switch: 'SW',
+  rack: 'RACK',
+  drop: 'DATA',
+  fiber: 'FIBER',
+  access: 'ACCESS',
+  note: 'NOTE',
+};
+
 function json(data, init = {}) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -14,10 +25,36 @@ function cleanFilename(name = 'plan.pdf') {
     .replace(/^-|-$/g, '') || 'plan.pdf';
 }
 
+function numberInRange(value, min, max) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
+function nullableText(value, maxLength = 2000) {
+  if (value === undefined) return undefined;
+  const text = String(value ?? '').trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
 async function getProject(env, id) {
   return env.DB.prepare(
     `SELECT id, name, client_name, site_address, description, status, created_at, updated_at
      FROM projects WHERE id = ?`
+  ).bind(id).first();
+}
+
+async function getPlan(env, id) {
+  return env.DB.prepare(
+    `SELECT id, project_id, name, floor_name, original_filename, r2_key, page_number, created_at, updated_at
+     FROM plans WHERE id = ?`
+  ).bind(id).first();
+}
+
+async function getDevice(env, id) {
+  return env.DB.prepare(
+    `SELECT id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+            mounting_height, cable_type, home_run, notes, status, created_at, updated_at
+     FROM devices WHERE id = ?`
   ).bind(id).first();
 }
 
@@ -31,7 +68,7 @@ export default {
         return json({
           app: 'SiteForge',
           status: 'ok',
-          version: '0.2.0',
+          version: '0.3.0',
           database: Boolean(env.DB),
           files: Boolean(env.FILES),
         });
@@ -92,8 +129,13 @@ export default {
         }
 
         const { results: plans } = await env.DB.prepare(
-          `SELECT id, project_id, name, floor_name, original_filename, page_number, created_at, updated_at
-           FROM plans WHERE project_id = ? ORDER BY created_at DESC`
+          `SELECT pl.id, pl.project_id, pl.name, pl.floor_name, pl.original_filename, pl.page_number,
+                  pl.created_at, pl.updated_at, COUNT(d.id) AS device_count
+           FROM plans pl
+           LEFT JOIN devices d ON d.plan_id = pl.id
+           WHERE pl.project_id = ?
+           GROUP BY pl.id
+           ORDER BY pl.created_at DESC`
         ).bind(projectId).all();
 
         return json({ project, plans: plans || [] });
@@ -171,9 +213,140 @@ export default {
             name: planName || file.name.replace(/\.pdf$/i, ''),
             floor_name: floorName,
             original_filename: file.name,
+            device_count: 0,
             url: `/api/plans/${planId}/file`,
           },
         }, { status: 201 });
+      }
+
+      const planDevicesMatch = url.pathname.match(/^\/api\/plans\/([^/]+)\/devices$/);
+      if (planDevicesMatch && method === 'POST') {
+        const planId = decodeURIComponent(planDevicesMatch[1]);
+        const plan = await getPlan(env, planId);
+        if (!plan) return json({ error: 'Plan not found.' }, { status: 404 });
+
+        const body = await request.json();
+        const deviceType = String(body?.deviceType || '').trim().toLowerCase();
+        if (!DEVICE_PREFIXES[deviceType]) {
+          return json({ error: 'Unsupported device type.' }, { status: 400 });
+        }
+
+        const xPercent = numberInRange(body?.xPercent, 0, 100);
+        const yPercent = numberInRange(body?.yPercent, 0, 100);
+        if (xPercent === null || yPercent === null) {
+          return json({ error: 'Device coordinates must be between 0 and 100.' }, { status: 400 });
+        }
+
+        const countRow = await env.DB.prepare(
+          `SELECT COUNT(*) AS count FROM devices WHERE plan_id = ? AND device_type = ?`
+        ).bind(planId, deviceType).first();
+        const sequence = Number(countRow?.count || 0) + 1;
+        const defaultLabel = `${DEVICE_PREFIXES[deviceType]}-${String(sequence).padStart(2, '0')}`;
+        const label = String(body?.label || defaultLabel).trim().slice(0, 80) || defaultLabel;
+        const deviceId = crypto.randomUUID();
+
+        await env.DB.prepare(
+          `INSERT INTO devices (
+             id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+             mounting_height, cable_type, home_run, notes
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          deviceId,
+          plan.project_id,
+          planId,
+          deviceType,
+          label,
+          nullableText(body?.model, 120) ?? null,
+          xPercent,
+          yPercent,
+          numberInRange(body?.rotation ?? 0, -360, 360) ?? 0,
+          nullableText(body?.mountingHeight, 80) ?? null,
+          nullableText(body?.cableType, 80) ?? null,
+          nullableText(body?.homeRun, 120) ?? null,
+          nullableText(body?.notes, 4000) ?? null
+        ).run();
+
+        await env.DB.prepare(
+          `UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        ).bind(plan.project_id).run();
+
+        return json({ device: await getDevice(env, deviceId) }, { status: 201 });
+      }
+
+      const planDetailMatch = url.pathname.match(/^\/api\/plans\/([^/]+)$/);
+      if (planDetailMatch && method === 'GET') {
+        const planId = decodeURIComponent(planDetailMatch[1]);
+        const plan = await getPlan(env, planId);
+        if (!plan) return json({ error: 'Plan not found.' }, { status: 404 });
+
+        const { results: devices } = await env.DB.prepare(
+          `SELECT id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+                  mounting_height, cable_type, home_run, notes, status, created_at, updated_at
+           FROM devices WHERE plan_id = ? ORDER BY created_at ASC`
+        ).bind(planId).all();
+
+        const { r2_key, ...safePlan } = plan;
+        return json({
+          plan: { ...safePlan, url: `/api/plans/${planId}/file` },
+          devices: devices || [],
+        });
+      }
+
+      const deviceMatch = url.pathname.match(/^\/api\/devices\/([^/]+)$/);
+      if (deviceMatch && method === 'PATCH') {
+        const deviceId = decodeURIComponent(deviceMatch[1]);
+        const current = await getDevice(env, deviceId);
+        if (!current) return json({ error: 'Device not found.' }, { status: 404 });
+
+        const body = await request.json();
+        const xPercent = body?.xPercent === undefined ? current.x_percent : numberInRange(body.xPercent, 0, 100);
+        const yPercent = body?.yPercent === undefined ? current.y_percent : numberInRange(body.yPercent, 0, 100);
+        const rotation = body?.rotation === undefined ? current.rotation : numberInRange(body.rotation, -360, 360);
+
+        if (xPercent === null || yPercent === null || rotation === null) {
+          return json({ error: 'Invalid position or rotation.' }, { status: 400 });
+        }
+
+        const label = body?.label === undefined
+          ? current.label
+          : (String(body.label || '').trim().slice(0, 80) || current.label);
+
+        const model = body?.model === undefined ? current.model : nullableText(body.model, 120);
+        const mountingHeight = body?.mountingHeight === undefined ? current.mounting_height : nullableText(body.mountingHeight, 80);
+        const cableType = body?.cableType === undefined ? current.cable_type : nullableText(body.cableType, 80);
+        const homeRun = body?.homeRun === undefined ? current.home_run : nullableText(body.homeRun, 120);
+        const notes = body?.notes === undefined ? current.notes : nullableText(body.notes, 4000);
+        const status = body?.status === undefined
+          ? current.status
+          : (String(body.status || 'planned').trim().slice(0, 40) || 'planned');
+
+        await env.DB.prepare(
+          `UPDATE devices
+           SET label = ?, model = ?, x_percent = ?, y_percent = ?, rotation = ?, mounting_height = ?,
+               cable_type = ?, home_run = ?, notes = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        ).bind(
+          label, model, xPercent, yPercent, rotation, mountingHeight,
+          cableType, homeRun, notes, status, deviceId
+        ).run();
+
+        await env.DB.prepare(
+          `UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        ).bind(current.project_id).run();
+
+        return json({ device: await getDevice(env, deviceId) });
+      }
+
+      if (deviceMatch && method === 'DELETE') {
+        const deviceId = decodeURIComponent(deviceMatch[1]);
+        const current = await getDevice(env, deviceId);
+        if (!current) return json({ error: 'Device not found.' }, { status: 404 });
+
+        await env.DB.prepare(`DELETE FROM devices WHERE id = ?`).bind(deviceId).run();
+        await env.DB.prepare(
+          `UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        ).bind(current.project_id).run();
+        return new Response(null, { status: 204 });
       }
 
       const planFileMatch = url.pathname.match(/^\/api\/plans\/([^/]+)\/file$/);
