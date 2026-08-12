@@ -1,7 +1,7 @@
 {
   "name": "siteforge",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "deploy": "npm run db:migrate && wrangler deploy"
   },
   "dependencies": {
+    "pdfjs-dist": "5.7.284",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
