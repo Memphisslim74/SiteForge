@@ -30,6 +30,11 @@ function numberInRange(value, min, max) {
   return Number.isFinite(number) && number >= min && number <= max ? number : null;
 }
 
+function pageNumber(value, fallback = 1) {
+  const number = Number(value ?? fallback);
+  return Number.isInteger(number) && number >= 1 && number <= 10000 ? number : null;
+}
+
 function nullableText(value, maxLength = 2000) {
   if (value === undefined) return undefined;
   const text = String(value ?? '').trim();
@@ -52,7 +57,7 @@ async function getPlan(env, id) {
 
 async function getDevice(env, id) {
   return env.DB.prepare(
-    `SELECT id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+    `SELECT id, project_id, plan_id, device_type, label, model, pdf_page, x_percent, y_percent, rotation,
             mounting_height, cable_type, home_run, notes, status, created_at, updated_at
      FROM devices WHERE id = ?`
   ).bind(id).first();
@@ -233,8 +238,9 @@ export default {
 
         const xPercent = numberInRange(body?.xPercent, 0, 100);
         const yPercent = numberInRange(body?.yPercent, 0, 100);
-        if (xPercent === null || yPercent === null) {
-          return json({ error: 'Device coordinates must be between 0 and 100.' }, { status: 400 });
+        const pdfPage = pageNumber(body?.pageNumber, 1);
+        if (xPercent === null || yPercent === null || pdfPage === null) {
+          return json({ error: 'Invalid device position or PDF page.' }, { status: 400 });
         }
 
         const countRow = await env.DB.prepare(
@@ -247,9 +253,9 @@ export default {
 
         await env.DB.prepare(
           `INSERT INTO devices (
-             id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+             id, project_id, plan_id, device_type, label, model, pdf_page, x_percent, y_percent, rotation,
              mounting_height, cable_type, home_run, notes
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           deviceId,
           plan.project_id,
@@ -257,6 +263,7 @@ export default {
           deviceType,
           label,
           nullableText(body?.model, 120) ?? null,
+          pdfPage,
           xPercent,
           yPercent,
           numberInRange(body?.rotation ?? 0, -360, 360) ?? 0,
@@ -280,7 +287,7 @@ export default {
         if (!plan) return json({ error: 'Plan not found.' }, { status: 404 });
 
         const { results: devices } = await env.DB.prepare(
-          `SELECT id, project_id, plan_id, device_type, label, model, x_percent, y_percent, rotation,
+          `SELECT id, project_id, plan_id, device_type, label, model, pdf_page, x_percent, y_percent, rotation,
                   mounting_height, cable_type, home_run, notes, status, created_at, updated_at
            FROM devices WHERE plan_id = ? ORDER BY created_at ASC`
         ).bind(planId).all();
@@ -302,9 +309,10 @@ export default {
         const xPercent = body?.xPercent === undefined ? current.x_percent : numberInRange(body.xPercent, 0, 100);
         const yPercent = body?.yPercent === undefined ? current.y_percent : numberInRange(body.yPercent, 0, 100);
         const rotation = body?.rotation === undefined ? current.rotation : numberInRange(body.rotation, -360, 360);
+        const pdfPage = body?.pageNumber === undefined ? current.pdf_page : pageNumber(body.pageNumber, current.pdf_page);
 
-        if (xPercent === null || yPercent === null || rotation === null) {
-          return json({ error: 'Invalid position or rotation.' }, { status: 400 });
+        if (xPercent === null || yPercent === null || rotation === null || pdfPage === null) {
+          return json({ error: 'Invalid position, page, or rotation.' }, { status: 400 });
         }
 
         const label = body?.label === undefined
@@ -322,11 +330,11 @@ export default {
 
         await env.DB.prepare(
           `UPDATE devices
-           SET label = ?, model = ?, x_percent = ?, y_percent = ?, rotation = ?, mounting_height = ?,
+           SET label = ?, model = ?, pdf_page = ?, x_percent = ?, y_percent = ?, rotation = ?, mounting_height = ?,
                cable_type = ?, home_run = ?, notes = ?, status = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`
         ).bind(
-          label, model, xPercent, yPercent, rotation, mountingHeight,
+          label, model, pdfPage, xPercent, yPercent, rotation, mountingHeight,
           cableType, homeRun, notes, status, deviceId
         ).run();
 
