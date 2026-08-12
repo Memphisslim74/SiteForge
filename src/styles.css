@@ -71,7 +71,7 @@ a { color: inherit; text-decoration: none; }
 .status.planning { text-transform: capitalize; color: #e3bd82; border-color: #665033; }
 .count-badge { min-width: 34px; padding: 5px 9px; }
 
-.primary, .secondary, .icon-button, .link-button {
+.primary, .secondary, .icon-button, .link-button, .danger-button {
   min-height: 44px;
   border-radius: 10px;
   padding: 0 17px;
@@ -84,6 +84,7 @@ a { color: inherit; text-decoration: none; }
 .primary.compact { min-height: 40px; padding-inline: 14px; }
 .secondary { border: 1px solid #47494b; background: #1c1e20; color: #f1eee7; }
 .secondary:hover { border-color: #76644b; background: #232527; }
+.secondary:disabled { opacity: .35; cursor: default; }
 .icon-button {
   width: 40px;
   min-height: 40px;
@@ -94,6 +95,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 1.45rem;
 }
 .link-button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 13px; }
+.danger-button { width: 100%; border: 1px solid #70423c; color: #e9b4aa; background: #261817; }
 
 .notice {
   margin-bottom: 14px;
@@ -280,6 +282,7 @@ textarea { resize: vertical; }
 .plan-info strong, .plan-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-info strong { font-size: .9rem; }
 .plan-info span { margin-top: 4px; color: #918d86; font-size: .75rem; }
+.plan-actions { display: flex; gap: 7px; }
 .empty-state {
   display: grid;
   place-items: center;
@@ -302,6 +305,7 @@ textarea { resize: vertical; }
   padding: 14px 17px;
   background: rgba(76,56,30,.14);
 }
+.next-step-strip.live-feature { border-color: #6d5737; }
 .next-step-strip strong { display: block; margin-top: 4px; }
 .next-step-strip > span { color: #a9a39a; font-size: .82rem; text-align: right; }
 
@@ -330,11 +334,218 @@ textarea { resize: vertical; }
 .modal-head { margin-bottom: 2px; }
 .modal-actions { justify-content: flex-end; margin-top: 3px; }
 
+/* Field blueprint workspace */
+.field-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 12px;
+  background: #0d0f10;
+}
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 8px 4px 12px;
+}
+.field-title { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.field-title h1 { margin: 2px 0 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(1.2rem, 2.4vw, 1.75rem); }
+.field-title > div { min-width: 0; }
+.field-title > div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #969189; font-size: .78rem; }
+.back-button { flex: 0 0 auto; }
+.field-controls { display: flex; gap: 8px; flex: 0 0 auto; }
+.segmented {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  overflow: hidden;
+  border: 1px solid #3b3d3f;
+  border-radius: 10px;
+  background: #17191b;
+}
+.segmented button {
+  width: 42px;
+  align-self: stretch;
+  border: 0;
+  color: #eee9e0;
+  background: transparent;
+  font-size: 1.15rem;
+}
+.segmented button:hover { background: #232527; }
+.segmented button:disabled { opacity: .3; }
+.segmented span { min-width: 68px; padding: 0 10px; color: #c6c0b7; font-size: .78rem; text-align: center; }
+
+.device-toolbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 9px;
+  border: 1px solid #2f3133;
+  border-radius: 14px;
+  background: #151719;
+  scrollbar-width: thin;
+}
+.tool-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 50px;
+  border: 1px solid #383a3c;
+  border-radius: 10px;
+  padding: 6px 12px 6px 7px;
+  color: #d7d2c9;
+  background: #1c1e20;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.tool-button.active { border-color: #c89449; color: #f4e4cb; background: #342718; box-shadow: 0 0 0 2px rgba(200,148,73,.15); }
+.tool-button:disabled { opacity: .35; cursor: default; }
+.tool-icon {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid #555759;
+  border-radius: 9px;
+  color: #f5f1e9;
+  background: #292b2d;
+  font-size: .62rem;
+  font-weight: 900;
+}
+.tool-button.active .tool-icon { border-color: #d4aa69; background: #8c612e; }
+.cancel-tool { margin-left: auto; }
+
+.field-instruction {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+  border: 1px solid #303234;
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: #bcb7ae;
+  background: #151719;
+  font-size: .78rem;
+}
+.field-instruction.armed { border-color: #765a34; color: #f0d7af; background: #241b11; }
+.field-instruction span { color: #8f8b84; }
+.field-notice { margin: 0 0 8px; }
+
+.blueprint-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-height: 0; }
+.blueprint-layout.with-inspector { grid-template-columns: minmax(0, 1fr) 330px; }
+.blueprint-host {
+  position: relative;
+  min-width: 0;
+  height: calc(100vh - 190px);
+  min-height: 480px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #303234;
+  border-radius: 14px;
+  padding: 18px;
+  background: #202326;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.blueprint-surface {
+  position: relative;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(0,0,0,.38);
+  user-select: none;
+}
+.blueprint-surface.placing-mode { cursor: crosshair; }
+.pdf-canvas { display: block; max-width: none; background: white; }
+.marker-layer { position: absolute; inset: 0; pointer-events: none; }
+.blueprint-loading, .blueprint-error {
+  position: absolute;
+  inset: 18px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed #44474a;
+  border-radius: 10px;
+  color: #bdb8af;
+  background: #17191b;
+  text-align: center;
+}
+.blueprint-error { color: #e1aaa2; }
+
+.device-marker {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  height: 46px;
+  border: 3px solid white;
+  border-radius: 50%;
+  padding: 0 5px;
+  color: white;
+  background: #25282a;
+  box-shadow: 0 5px 13px rgba(0,0,0,.42);
+  pointer-events: auto;
+  font-size: .61rem;
+  font-weight: 950;
+}
+.device-marker:hover, .device-marker.selected { outline: 3px solid rgba(200,148,73,.5); outline-offset: 3px; }
+.device-marker small {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: #fff;
+  background: rgba(17,19,21,.88);
+  font-size: .53rem;
+  white-space: nowrap;
+}
+.device-marker.type-ap { background: #3c514b; }
+.device-marker.type-camera { background: #543f38; }
+.device-marker.type-rack { background: #3f434b; border-radius: 9px; }
+.device-marker.type-switch { background: #4b4534; border-radius: 9px; }
+.device-marker.type-drop { background: #49413d; }
+.device-marker.type-fiber { background: #4b3d50; }
+.device-marker.type-access { background: #4b4333; }
+.device-marker.type-note { background: #565047; border-radius: 9px; }
+
+.device-inspector {
+  height: calc(100vh - 190px);
+  min-height: 480px;
+  overflow: auto;
+  border: 1px solid #343638;
+  border-radius: 14px;
+  padding: 17px;
+  background: #17191b;
+}
+.inspector-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+.inspector-head h2 { margin: 3px 0 0; font-size: 1.35rem; }
+.device-inspector form { display: grid; gap: 13px; }
+.inspector-row { grid-template-columns: 1fr 1fr; }
+.inspector-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+input[type="range"] { padding: 0; border: 0; box-shadow: none; accent-color: #c89449; }
+.range-value { color: #aaa59c; font-size: .72rem; }
+
 @media (max-width: 1100px) {
   .workspace { grid-template-columns: 250px minmax(0, 1fr); }
   .welcome-panel, .project-grid { grid-template-columns: 1fr; }
   .welcome-panel { min-height: auto; }
   .plan-preview { min-height: 430px; }
+  .blueprint-layout.with-inspector { grid-template-columns: minmax(0, 1fr) 290px; }
+}
+
+@media (max-width: 850px) {
+  .field-header { align-items: flex-start; }
+  .field-controls { flex-direction: column; }
+  .blueprint-layout.with-inspector { grid-template-columns: 1fr; }
+  .blueprint-host { height: 62vh; min-height: 430px; }
+  .device-inspector { height: auto; min-height: 0; }
+  .field-instruction { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 760px) {
@@ -345,15 +556,27 @@ textarea { resize: vertical; }
   .project-sidebar { border-right: 0; border-bottom: 1px solid #2f3133; }
   .project-list { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
   .main-panel { padding: 14px; }
-  .welcome-copy { padding: 28px 22px; }
-  .welcome-copy h2 { font-size: clamp(2.3rem, 12vw, 4rem); }
-  .form-row { grid-template-columns: 1fr; }
+  .welcome-panel { gap: 12px; }
+  .welcome-copy { padding: 26px 20px; }
+  .welcome-copy h2 { font-size: clamp(2.25rem, 12vw, 4rem); }
+  .plan-preview { min-height: 340px; }
   .project-header { align-items: flex-start; }
+  .project-grid { gap: 12px; }
+  .form-row { grid-template-columns: 1fr; }
   .next-step-strip { align-items: flex-start; flex-direction: column; }
   .next-step-strip > span { text-align: left; }
-}
+  .plan-row { grid-template-columns: auto minmax(0, 1fr); }
+  .plan-actions { grid-column: 1 / -1; }
+  .plan-actions > * { flex: 1; }
 
-@media (hover: none) and (pointer: coarse) {
-  .primary, .secondary, .project-row, .empty-card.interactive, .file-drop { min-height: 48px; }
-  input, textarea { font-size: 16px; }
+  .field-shell { padding: 7px; }
+  .field-header { display: grid; grid-template-columns: 1fr; }
+  .field-title { align-items: flex-start; }
+  .field-controls { flex-direction: row; justify-content: space-between; }
+  .back-button { min-height: 40px; padding-inline: 11px; }
+  .device-toolbar { padding: 7px; }
+  .tool-button { min-height: 48px; padding-right: 10px; }
+  .tool-button > span:last-child { display: none; }
+  .cancel-tool { margin-left: 0; }
+  .blueprint-host { height: 64vh; min-height: 390px; padding: 10px; }
 }
