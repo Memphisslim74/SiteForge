@@ -73,7 +73,7 @@ export default {
         return json({
           app: 'SiteForge',
           status: 'ok',
-          version: '0.3.1',
+          version: '0.3.2',
           database: Boolean(env.DB),
           files: Boolean(env.FILES),
         });
@@ -144,6 +144,32 @@ export default {
         ).bind(projectId).all();
 
         return json({ project, plans: plans || [] });
+      }
+
+      if (projectMatch && method === 'DELETE') {
+        const projectId = decodeURIComponent(projectMatch[1]);
+        const project = await getProject(env, projectId);
+        if (!project) return json({ error: 'Project not found.' }, { status: 404 });
+
+        const { results: projectPlans } = await env.DB.prepare(
+          `SELECT id, r2_key FROM plans WHERE project_id = ?`
+        ).bind(projectId).all();
+
+        await env.DB.batch([
+          env.DB.prepare(`DELETE FROM devices WHERE project_id = ?`).bind(projectId),
+          env.DB.prepare(`DELETE FROM plans WHERE project_id = ?`).bind(projectId),
+          env.DB.prepare(`DELETE FROM projects WHERE id = ?`).bind(projectId),
+        ]);
+
+        for (const plan of projectPlans || []) {
+          try {
+            await env.FILES.delete(plan.r2_key);
+          } catch (error) {
+            console.error('SiteForge project R2 cleanup error', plan.r2_key, error);
+          }
+        }
+
+        return new Response(null, { status: 204 });
       }
 
       const plansMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/plans$/);
