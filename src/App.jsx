@@ -50,6 +50,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingPlanId, setDeletingPlanId] = useState(null);
   const [message, setMessage] = useState('');
 
   const [workspacePlan, setWorkspacePlan] = useState(null);
@@ -222,6 +223,27 @@ export default function App() {
       setMessage(error.message);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function deletePlan(plan) {
+    if (!plan || deletingPlanId) return;
+    const confirmed = window.confirm(
+      `Delete ${plan.name}? This permanently removes the PDF and every device marker saved on this plan.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingPlanId(plan.id);
+      setMessage('');
+      await api(`/api/plans/${encodeURIComponent(plan.id)}`, { method: 'DELETE' });
+      setPlans((current) => current.filter((item) => item.id !== plan.id));
+      await loadProjects();
+      setMessage(`${plan.name} deleted.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setDeletingPlanId(null);
     }
   }
 
@@ -544,7 +566,7 @@ export default function App() {
           </div>
         </div>
         <div className="top-actions">
-          <span className="status">v0.3</span>
+          <span className="status">v0.3.1</span>
           <button className="primary compact" type="button" onClick={() => setShowNewProject(true)}>
             + New Project
           </button>
@@ -694,6 +716,14 @@ export default function App() {
                         <div className="plan-actions">
                           <button className="primary compact" type="button" onClick={() => openWorkspace(plan)}>Map</button>
                           <a className="secondary link-button" href={`/api/plans/${plan.id}/file`} target="_blank" rel="noreferrer">PDF</a>
+                          <button
+                            className="secondary link-button"
+                            type="button"
+                            disabled={deletingPlanId === plan.id}
+                            onClick={() => deletePlan(plan)}
+                          >
+                            {deletingPlanId === plan.id ? 'Deleting…' : 'Delete'}
+                          </button>
                         </div>
                       </article>
                     ))}
