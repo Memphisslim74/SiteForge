@@ -51,6 +51,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingPlanId, setDeletingPlanId] = useState(null);
+  const [deletingProjectId, setDeletingProjectId] = useState(null);
   const [message, setMessage] = useState('');
 
   const [workspacePlan, setWorkspacePlan] = useState(null);
@@ -244,6 +245,34 @@ export default function App() {
       setMessage(error.message);
     } finally {
       setDeletingPlanId(null);
+    }
+  }
+
+  async function deleteProject(project) {
+    if (!project || deletingProjectId) return;
+
+    const planCount = Number(project.plan_count ?? plans.length ?? 0);
+    const deviceCount = Number(project.device_count ?? 0);
+    const confirmed = window.confirm(
+      `Delete project "${project.name}"? This permanently removes ${planCount} plan${planCount === 1 ? '' : 's'}, ${deviceCount} saved marker${deviceCount === 1 ? '' : 's'}, and all stored PDFs for this project.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingProjectId(project.id);
+      setMessage('');
+      await api(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      setSelectedProject(null);
+      setPlans([]);
+      setWorkspacePlan(null);
+      setDevices([]);
+      setMessage(`${project.name} deleted.`);
+      await loadProjects();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setDeletingProjectId(null);
     }
   }
 
@@ -566,7 +595,7 @@ export default function App() {
           </div>
         </div>
         <div className="top-actions">
-          <span className="status">v0.3.1</span>
+          <span className="status">v0.3.2</span>
           <button className="primary compact" type="button" onClick={() => setShowNewProject(true)}>
             + New Project
           </button>
@@ -645,7 +674,17 @@ export default function App() {
                     {[selectedSummary.client_name, selectedSummary.site_address].filter(Boolean).join(' · ') || 'Planning'}
                   </p>
                 </div>
-                <span className="status planning">{selectedSummary.status || 'planning'}</span>
+                <div className="top-actions">
+                  <span className="status planning">{selectedSummary.status || 'planning'}</span>
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={deletingProjectId === selectedSummary.id}
+                    onClick={() => deleteProject(selectedSummary)}
+                  >
+                    {deletingProjectId === selectedSummary.id ? 'Deleting…' : 'Delete Project'}
+                  </button>
+                </div>
               </div>
 
               <div className="project-grid">
